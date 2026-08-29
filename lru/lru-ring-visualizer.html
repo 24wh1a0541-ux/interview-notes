@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LRU Cache — Circular Linked List Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12141F;
+    --panel:#1B1E2E;
+    --panel-2:#20243660;
+    --border:#33384E;
+
+    --ink:#F5F6FC;
+    --muted:#ACB2C8;
+
+    --blue:#6C7BFF;
+    --blue-soft:#262A52;
+    --green:#20E3A2;
+    --green-soft:#123B34;
+    --amber:#FFB020;
+    --amber-soft:#402C10;
+    --red:#FF5C6C;
+    --red-soft:#411F2A;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 10% -10%, rgba(108,123,255,0.14), transparent 60%),
+      radial-gradient(ellipse 900px 600px at 100% 100%, rgba(32,227,162,0.10), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    font-size:17px;
+    min-height:100vh;
+  }
+  .app{max-width:1220px; margin:0 auto; padding:38px 24px 70px;}
+
+  header{margin-bottom:24px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:13px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--blue); margin:0 0 10px; font-weight:700;
+  }
+  h1{font-size:clamp(28px,3.6vw,40px); font-weight:900; margin:0 0 10px; letter-spacing:-0.01em; line-height:1.15;}
+  h1 span{color:var(--muted); font-weight:600;}
+  .sub{color:var(--muted); font-size:17px; max-width:760px; line-height:1.65; margin:0;}
+
+  .explainer{
+    margin-top:20px;
+    background:var(--blue-soft);
+    border:1px solid #3B4380;
+    border-radius:16px;
+    padding:18px 20px;
+    display:flex; gap:14px; align-items:flex-start;
+  }
+  .explainer .icon{
+    flex:0 0 auto; width:36px; height:36px; border-radius:10px;
+    background:var(--blue); color:#0E1030;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-weight:800; font-size:17px;
+  }
+  .explainer.hit{background:var(--green-soft); border-color:#1E7A63;}
+  .explainer.hit .icon{background:var(--green); color:#06251D;}
+  .explainer.evict{background:var(--red-soft); border-color:#8A3A4B;}
+  .explainer.evict .icon{background:var(--red); color:#3A0C14;}
+  .explainer.miss{background:var(--amber-soft); border-color:#8A6425;}
+  .explainer.miss .icon{background:var(--amber); color:#341F04;}
+  .explainer-text{flex:1;}
+  .explainer-text .headline{font-size:18px; font-weight:700; margin:0 0 5px; line-height:1.45; color:var(--ink);}
+  .explainer-text .code-line{font-family:'IBM Plex Mono',monospace; font-size:14px; color:var(--muted); margin:0;}
+
+  main{display:grid; grid-template-columns:1.5fr 1fr; gap:22px; align-items:start; margin-top:22px;}
+  @media (max-width:920px){ main{grid-template-columns:1fr;} }
+
+  .ring-panel{
+    background:linear-gradient(180deg, var(--panel), #171A28);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:10px 10px 8px;
+  }
+  svg#ring{width:100%; height:auto; display:block;}
+  .node-label{font-family:'IBM Plex Mono',monospace; font-weight:700; text-anchor:middle; pointer-events:none;}
+  .node-val{font-family:'IBM Plex Mono',monospace; font-weight:500; text-anchor:middle; pointer-events:none;}
+  .chip-text{font-family:'Inter',sans-serif; font-weight:800; font-size:12px; text-anchor:middle; letter-spacing:0.04em;}
+
+  .legend{
+    display:flex; gap:22px; flex-wrap:wrap; justify-content:center;
+    padding:6px 16px 16px; font-size:14px; color:var(--muted);
+  }
+  .legend .item{display:flex; align-items:center; gap:7px;}
+  .swatch{width:20px; height:0; border-top:3px solid; display:inline-block; position:relative;}
+  .swatch.next{border-color:var(--blue);}
+  .swatch.next::after{content:''; position:absolute; right:-7px; top:-5px; border:6px solid transparent; border-left-color:var(--blue); border-right:0;}
+  .swatch.prev{border-color:#5B6178; border-top-style:dashed;}
+  .swatch.prev::after{content:''; position:absolute; left:-7px; top:-5px; border:6px solid transparent; border-right-color:#5B6178; border-left:0;}
+  .dot{width:11px; height:11px; border-radius:50%; display:inline-block;}
+  .dot.head{background:var(--blue);}
+  .dot.tail{background:var(--amber);}
+
+  /* array view */
+  .array-panel{
+    border-top:1px solid var(--border);
+    padding:18px 18px 6px;
+  }
+  .array-title{
+    font-family:'IBM Plex Mono',monospace; font-size:12.5px; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--muted); margin:0 0 12px; font-weight:600;
+  }
+  .array-row{
+    display:flex; gap:10px; overflow-x:auto; padding-bottom:14px; min-height:96px; align-items:flex-start;
+  }
+  .array-cell{
+    flex:0 0 auto;
+    width:84px;
+    border-radius:12px;
+    background:#20243A;
+    border:2px solid var(--border);
+    padding:10px 8px 8px;
+    text-align:center;
+    transition:border-color 0.25s ease, background 0.25s ease, transform 0.2s ease;
+  }
+  .array-cell .idx{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:6px;}
+  .array-cell .kv{font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:700; color:var(--ink);}
+  .array-cell .kv .v{color:var(--muted); font-weight:500;}
+  .array-cell .tag{font-size:9.5px; font-weight:800; letter-spacing:0.06em; margin-top:6px; visibility:hidden;}
+  .array-cell.head{border-color:var(--blue); background:var(--blue-soft);}
+  .array-cell.head .tag{visibility:visible; color:var(--blue);}
+  .array-cell.tail{border-color:var(--amber); background:var(--amber-soft);}
+  .array-cell.tail .tag{visibility:visible; color:var(--amber);}
+  .array-cell.pulse-hit{animation:pulseHit 0.7s ease;}
+  .array-cell.pulse-new{animation:pulseNew 0.7s ease;}
+  @keyframes pulseHit{0%{transform:scale(1);} 30%{transform:scale(1.08); border-color:var(--green); background:var(--green-soft);} 100%{transform:scale(1);}}
+  @keyframes pulseNew{0%{transform:translateY(-8px); opacity:0.3;} 100%{transform:translateY(0); opacity:1;}}
+  .array-empty{color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:14px; padding:10px 2px;}
+
+  .control-panel{display:flex; flex-direction:column; gap:16px;}
+  .block{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:18px 20px;
+  }
+  .block-title{font-size:12.5px; font-weight:800; text-transform:uppercase; letter-spacing:0.07em; color:var(--muted); margin:0 0 14px;}
+
+  .tabs{display:flex; gap:6px; background:#20243A; border-radius:12px; padding:5px; margin-bottom:16px;}
+  .tab-btn{
+    flex:1; border:none; background:transparent; border-radius:9px; padding:10px 12px;
+    font-family:'Inter',sans-serif; font-weight:700; font-size:14px; color:var(--muted); cursor:pointer;
+  }
+  .tab-btn.active{background:var(--blue); color:#0E1030;}
+  .mode-panel{display:none;}
+  .mode-panel.active{display:block;}
+
+  .cap-row{display:flex; align-items:center; gap:14px;}
+  input[type=range]{flex:1; accent-color:var(--blue); height:22px;}
+  .cap-value{font-family:'IBM Plex Mono',monospace; font-size:19px; font-weight:800; color:var(--blue); min-width:22px; text-align:right;}
+
+  .field-row{display:flex; gap:9px; margin-bottom:11px;}
+  input[type=text], select{
+    flex:1; min-width:0; background:#12141F; border:1.5px solid var(--border); border-radius:10px;
+    padding:11px 12px; color:var(--ink); font-family:'IBM Plex Mono',monospace; font-size:15px;
+  }
+  input[type=text]::placeholder{color:#666C82;}
+  input[type=text]:focus-visible, button:focus-visible, select:focus-visible, input[type=range]:focus-visible{
+    outline:2px solid var(--green); outline-offset:2px;
+  }
+
+  .btn-row{display:flex; gap:9px;}
+  button{
+    font-family:'Inter',sans-serif; font-weight:800; font-size:14.5px; border-radius:10px; border:1px solid transparent;
+    padding:11px 14px; cursor:pointer; transition:transform 0.08s ease, opacity 0.15s ease, filter 0.15s ease; flex:1;
+  }
+  button:active{transform:scale(0.96);}
+  .btn-primary{background:var(--blue); color:#0E1030;}
+  .btn-primary:hover{filter:brightness(1.1);}
+  .btn-accent{background:var(--green); color:#06251D;}
+  .btn-accent:hover{filter:brightness(1.1);}
+  .btn-ghost{background:#242939; color:var(--ink); border:1.5px solid var(--border);}
+  .btn-ghost:hover{border-color:var(--blue);}
+  .mono-btn{font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:700;}
+
+  .helper{font-size:13.5px; line-height:1.6; color:var(--muted); margin:12px 0 0;}
+  .helper code{font-family:'IBM Plex Mono',monospace; color:var(--blue); font-size:13px;}
+
+  .log-list{
+    height:230px; overflow-y:auto; display:flex; flex-direction:column-reverse; gap:10px;
+    font-size:14px; line-height:1.5; padding-right:4px;
+  }
+  .log-list::-webkit-scrollbar{width:7px;}
+  .log-list::-webkit-scrollbar-thumb{background:var(--border); border-radius:4px;}
+  .log-entry{border-left:4px solid var(--border); padding:2px 0 2px 12px;}
+  .log-entry .plain{color:var(--ink); font-weight:600;}
+  .log-entry .code{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--muted); display:block; margin-top:3px;}
+  .log-entry .t{font-family:'IBM Plex Mono',monospace; color:#666C82; font-size:11.5px; margin-right:7px;}
+  .log-entry.hit{border-color:var(--green);}
+  .log-entry.evict{border-color:var(--red);}
+  .log-entry.miss{border-color:var(--amber);}
+  .log-entry.info{border-color:var(--blue);}
+
+  @media (prefers-reduced-motion: reduce){ button, .array-cell{transition:none !important; animation:none !important;} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <p class="eyebrow">Data structure visualizer</p>
+    <h1>LRU Cache <span>— built on a circular doubly-linked list</span></h1>
+    <p class="sub">Every item is a node arranged in a ring. The top slot is always <strong>HEAD</strong> (most recently used). New or reused items get moved there. The slot just behind it is <strong>TAIL</strong> (least recently used) — the one that gets removed first when the cache is full.</p>
+
+    <div class="explainer info" id="explainer">
+      <div class="icon" id="explainerIcon">i</div>
+      <div class="explainer-text">
+        <p class="headline" id="explainerHeadline">Nothing has happened yet.</p>
+        <p class="code-line" id="explainerCode">Try PUT 1, 10 to add your first item.</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="ring-panel">
+      <svg id="ring" viewBox="0 0 600 540" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="legend">
+        <span class="item"><span class="swatch next"></span> next pointer</span>
+        <span class="item"><span class="swatch prev"></span> prev pointer</span>
+        <span class="item"><span class="dot head"></span> HEAD (most recent)</span>
+        <span class="item"><span class="dot tail"></span> TAIL (about to be evicted)</span>
+      </div>
+      <div class="array-panel">
+        <p class="array-title">Array view — same order, HEAD → TAIL</p>
+        <div class="array-row" id="arrayRow"></div>
+      </div>
+    </section>
+
+    <aside class="control-panel">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="cache">LRU Cache</button>
+        <button class="tab-btn" data-tab="raw">Raw Linked List</button>
+      </div>
+
+      <div class="mode-panel active" id="tab-cache">
+        <div class="block">
+          <p class="block-title">Capacity</p>
+          <div class="cap-row">
+            <input type="range" id="capRange" min="2" max="6" value="4" />
+            <span class="cap-value" id="capVal">4</span>
+          </div>
+          <p class="helper">How many items the cache can hold before it evicts the least recently used one.</p>
+        </div>
+
+        <div class="block">
+          <p class="block-title">Access the cache</p>
+          <div class="field-row">
+            <input type="text" id="keyInput" placeholder="key" maxlength="6" />
+            <input type="text" id="valInput" placeholder="value" maxlength="6" />
+          </div>
+          <div class="btn-row">
+            <button class="btn-primary" id="putBtn">PUT</button>
+            <button class="btn-accent" id="getBtn">GET</button>
+          </div>
+          <p class="helper"><b>PUT</b> adds or updates a key and marks it most recent. <b>GET</b> reads a key and marks it most recent — or misses if it isn't cached.</p>
+        </div>
+      </div>
+
+      <div class="mode-panel" id="tab-raw">
+        <div class="block">
+          <p class="block-title">CDLLNode methods</p>
+          <div class="field-row">
+            <input type="text" id="rawKeyInput" placeholder="key" maxlength="6" />
+            <input type="text" id="rawValInput" placeholder="value" maxlength="6" />
+          </div>
+          <div class="btn-row" style="margin-bottom:9px;">
+            <button class="btn-ghost mono-btn" id="insBtn">insAtBegin(k,v)</button>
+            <button class="btn-ghost mono-btn" id="delBtn">delAtEnd()</button>
+          </div>
+          <div class="field-row">
+            <select id="moveSelect"></select>
+            <button class="btn-ghost mono-btn" id="moveBtn" style="flex:0 0 auto;">moveToFro</button>
+          </div>
+          <button class="btn-ghost mono-btn" id="traverseBtn" style="width:100%;">traverse()</button>
+          <p class="helper">These are the exact list operations, with no capacity limit — the same ones the cache calls internally.</p>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="btn-row">
+          <button class="btn-ghost" id="demoBtn">▶ Run demo</button>
+          <button class="btn-ghost" id="resetBtn">Reset</button>
+        </div>
+      </div>
+
+      <div class="block" style="flex:1;">
+        <p class="block-title">Event log</p>
+        <div class="log-list" id="logList"></div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<script>
+(function(){
+  const svgNS = "http://www.w3.org/2000/svg";
+  const cx = 300, cy = 250, radius = 172, nodeR = 34;
+  const nextR = radius - 12, prevR = radius + 12;
+
+  const svg = document.getElementById('ring');
+  const logList = document.getElementById('logList');
+  const capRange = document.getElementById('capRange');
+  const capVal = document.getElementById('capVal');
+  const moveSelect = document.getElementById('moveSelect');
+  const explainer = document.getElementById('explainer');
+  const explainerIcon = document.getElementById('explainerIcon');
+  const explainerHeadline = document.getElementById('explainerHeadline');
+  const explainerCode = document.getElementById('explainerCode');
+  const arrayRow = document.getElementById('arrayRow');
+
+  let capacity = parseInt(capRange.value, 10);
+  let nodes = [];
+  let nodeMap = new Map();
+  let idCounter = 0;
+  let fading = [];
+
+  function point(angleDeg, r){
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+  function normalize(a){ return ((a % 360) + 360) % 360; }
+  function shortestDiff(a, b){ let d = (b - a) % 360; if (d > 180) d -= 360; if (d < -180) d += 360; return d; }
+  function layoutTargets(){
+    const n = nodes.length;
+    nodes.forEach((node, i) => { node.target = n ? (360 * i / n) : 0; });
+  }
+
+  const ICONS = { info:'i', hit:'✓', evict:'×', miss:'?' };
+  function explain(type, headline, code){
+    explainer.className = 'explainer ' + type;
+    explainerIcon.textContent = ICONS[type] || 'i';
+    explainerHeadline.textContent = headline;
+    explainerCode.textContent = code;
+  }
+
+  function log(plain, code, type){
+    const el = document.createElement('div');
+    el.className = 'log-entry' + (type ? (' ' + type) : '');
+    const time = new Date().toLocaleTimeString([], {minute:'2-digit', second:'2-digit'});
+    el.innerHTML = '<span class="t">' + time + '</span><span class="plain">' + plain + '</span>' +
+      (code ? '<span class="code">' + code + '</span>' : '');
+    logList.appendChild(el);
+    logList.scrollTop = logList.scrollHeight;
+    explain(type || 'info', plain, code || '');
+  }
+
+  function flashMiss(){
+    svg.parentElement.animate(
+      [{ boxShadow:'inset 0 0 0 0 rgba(255,176,32,0)' }, { boxShadow:'inset 0 0 34px 3px rgba(255,176,32,0.35)' }, { boxShadow:'inset 0 0 0 0 rgba(255,176,32,0)' }],
+      { duration: 600 }
+    );
+  }
+
+  function refreshMoveSelect(){
+    const prev = moveSelect.value;
+    moveSelect.innerHTML = '';
+    nodes.forEach(node => {
+      const opt = document.createElement('option');
+      opt.value = node.k;
+      opt.textContent = node.k + ':' + node.v + (node === nodes[0] ? '  (HEAD)' : (node === nodes[nodes.length - 1] ? '  (TAIL)' : ''));
+      moveSelect.appendChild(opt);
+    });
+    if ([...moveSelect.options].some(o => o.value === prev)) moveSelect.value = prev;
+  }
+
+  // ---- array view ----
+  function renderArray(pulseKey, pulseType){
+    arrayRow.innerHTML = '';
+    if (nodes.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'array-empty';
+      empty.textContent = 'empty — nothing cached yet';
+      arrayRow.appendChild(empty);
+      return;
+    }
+    nodes.forEach((node, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'array-cell';
+      if (i === 0) cell.classList.add('head');
+      if (i === nodes.length - 1 && nodes.length > 1) cell.classList.add('tail');
+      if (node.k === pulseKey){
+        cell.classList.add(pulseType === 'new' ? 'pulse-new' : 'pulse-hit');
+      }
+      cell.innerHTML =
+        '<div class="idx">[' + i + ']</div>' +
+        '<div class="kv">' + node.k + ':<span class="v">' + node.v + '</span></div>' +
+        '<div class="tag">' + (i === 0 ? 'HEAD' : (i === nodes.length - 1 && nodes.length > 1 ? 'TAIL' : '')) + '</div>';
+      arrayRow.appendChild(cell);
+    });
+  }
+
+  // ---- raw CDLLNode-style methods (no capacity limit) ----
+
+  function rawInsAtBegin(k, v, silent){
+    const node = { k, v: v || '', id: idCounter++, angle: 0, target: 0 };
+    const nWas = nodes.length;
+    node.angle = nWas ? normalize(360 * nWas / (nWas + 1)) + 40 : 0;
+    nodeMap.set(k, node);
+    nodes.unshift(node);
+    node.flashUntil = performance.now() + 700;
+    node.flashColor = 'blue';
+    if (!silent) log('Added a new node "' + k + ':' + v + '" and linked it in at HEAD.', 'insAtBegin(' + k + ', ' + v + ')', 'info');
+    layoutTargets();
+    return node;
+  }
+
+  function rawDelAtEnd(silent){
+    if (nodes.length === 0){
+      if (!silent) log('The list is empty — nothing to remove.', 'delAtEnd() → -1', 'miss');
+      return null;
+    }
+    const evicted = nodes.pop();
+    nodeMap.delete(evicted.k);
+    evicted.fadeStart = performance.now();
+    fading.push(evicted);
+    if (!silent) log('Unlinked the TAIL node and returned its key.', 'delAtEnd() → ' + evicted.k, 'evict');
+    layoutTargets();
+    return evicted.k;
+  }
+
+  function rawMoveToFro(node, silent){
+    if (!node || nodes[0] === node) return;
+    nodes = nodes.filter(x => x !== node);
+    nodes.unshift(node);
+    node.flashUntil = performance.now() + 700;
+    node.flashColor = 'green';
+    if (!silent) log('Unlinked node "' + node.k + '" from its spot and re-linked it at HEAD.', 'moveToFro(node[' + node.k + '])', 'hit');
+    layoutTargets();
+  }
+
+  function traverse(){
+    if (nodes.length === 0){ log('The list is empty.', 'traverse()', 'info'); return; }
+    const line = nodes.map(n => n.k + ' ' + n.v).join('  ');
+    log('Walked the ring from HEAD to TAIL and printed every node.', 'traverse() → ' + line, 'info');
+  }
+
+  // ---- cache-level ops (thin policy layer over the raw methods) ----
+
+  function put(k, v){
+    if (!k) return;
+    if (nodeMap.has(k)){
+      const node = nodeMap.get(k);
+      node.v = v || node.v;
+      rawMoveToFro(node, true);
+      node.flashColor = 'blue';
+      log('Key "' + k + '" was already cached, so its value was updated and it was marked most recent.', 'moveToFro(node[' + k + '])', 'info');
+      renderArray(k, 'hit');
+    } else {
+      rawInsAtBegin(k, v, true);
+      if (nodes.length > capacity){
+        const evictedKey = rawDelAtEnd(true);
+        log('Added "' + k + ':' + v + '" at HEAD. The cache was full, so the least recently used key ("' + evictedKey + '") was evicted from TAIL.',
+            'insAtBegin(' + k + ', ' + v + ')  →  delAtEnd() → ' + evictedKey, 'evict');
+      } else {
+        log('Added "' + k + ':' + v + '" as the new most-recently-used item.', 'insAtBegin(' + k + ', ' + v + ')', 'info');
+      }
+      renderArray(k, 'new');
+    }
+    refreshMoveSelect();
+  }
+
+  function get(k){
+    if (!k) return;
+    if (!nodeMap.has(k)){
+      log('Key "' + k + '" is not in the cache.', 'GET(' + k + ') → miss', 'miss');
+      flashMiss();
+      return;
+    }
+    const node = nodeMap.get(k);
+    rawMoveToFro(node, true);
+    log('Found "' + k + '" (value ' + node.v + ') and marked it most recently used.', 'moveToFro(node[' + k + '])', 'hit');
+    renderArray(k, 'hit');
+    refreshMoveSelect();
+  }
+
+  function setCapacity(newCap){
+    capacity = newCap;
+    capVal.textContent = newCap;
+    while (nodes.length > capacity){
+      const evictedKey = rawDelAtEnd(true);
+      log('Capacity lowered to ' + capacity + ', so the least recently used key ("' + evictedKey + '") was evicted.', 'delAtEnd() → ' + evictedKey, 'evict');
+    }
+    renderArray();
+    refreshMoveSelect();
+  }
+
+  function reset(){
+    nodes = []; nodeMap.clear(); fading = [];
+    logList.innerHTML = '';
+    explain('info', 'Ring reset.', 'Try PUT 1, 10 to add your first item.');
+    layoutTargets();
+    renderArray();
+    refreshMoveSelect();
+  }
+
+  function clearEl(el){ while (el.firstChild) el.removeChild(el.firstChild); }
+
+  function makeArc(p1, p2, r, sweep, color, opacity, dashed){
+    const path = document.createElementNS(svgNS, 'path');
+    const d = 'M ' + p1.x.toFixed(1) + ',' + p1.y.toFixed(1) + ' A ' + r + ',' + r + ' 0 0,' + sweep + ' ' + p2.x.toFixed(1) + ',' + p2.y.toFixed(1);
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', dashed ? '2' : '3');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('opacity', opacity);
+    if (dashed) path.setAttribute('stroke-dasharray', '3,4');
+    path.setAttribute('marker-end', dashed ? 'url(#arrowGray)' : 'url(#arrowBlue)');
+    return path;
+  }
+
+  let linksG, nodesG, flagsG;
+  function initSvgGroups(){
+    clearEl(svg);
+    const defs = document.createElementNS(svgNS, 'defs');
+    defs.innerHTML =
+      '<marker id="arrowBlue" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6C7BFF"></path></marker>' +
+      '<marker id="arrowGray" viewBox="0 0 10 10" refX="7.5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7A8098"></path></marker>';
+    svg.appendChild(defs);
+    linksG = document.createElementNS(svgNS, 'g');
+    nodesG = document.createElementNS(svgNS, 'g');
+    flagsG = document.createElementNS(svgNS, 'g');
+    svg.appendChild(linksG); svg.appendChild(nodesG); svg.appendChild(flagsG);
+  }
+
+  function draw(){
+    clearEl(linksG); clearEl(nodesG); clearEl(flagsG);
+    const n = nodes.length;
+
+    if (n > 1){
+      const trim = Math.max(10, Math.min(20, 140 / n));
+      for (let i = 0; i < n; i++){
+        const a = nodes[i], b = nodes[(i + 1) % n];
+        const pa_in = point(a.angle + trim, nextR), pb_in = point(b.angle - trim, nextR);
+        linksG.appendChild(makeArc(pa_in, pb_in, nextR, '1', '#6C7BFF', 0.95, false));
+        const pb_out = point(b.angle - trim, prevR), pa_out = point(a.angle + trim, prevR);
+        linksG.appendChild(makeArc(pb_out, pa_out, prevR, '0', '#7A8098', 0.8, true));
+      }
+    }
+
+    const now = performance.now();
+    nodes.forEach((node, i) => {
+      const diff = shortestDiff(node.angle, node.target);
+      node.angle += diff * 0.16;
+      const p = point(normalize(node.angle), radius);
+
+      let stroke = '#3A3F58', fill = '#1B1E2E', strokeW = 2;
+      if (i === 0){ stroke = '#6C7BFF'; strokeW = 3; }
+      if (i === n - 1 && n > 1){ stroke = '#FFB020'; strokeW = 3; }
+      if (node.flashUntil && now < node.flashUntil){
+        const flashColors = { blue:'#6C7BFF', green:'#20E3A2' };
+        stroke = flashColors[node.flashColor] || '#6C7BFF';
+        strokeW = 3.6;
+      }
+
+      const g = document.createElementNS(svgNS, 'g');
+      g.setAttribute('transform', 'translate(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')');
+
+      const circle = document.createElementNS(svgNS, 'circle');
+      circle.setAttribute('r', nodeR);
+      circle.setAttribute('fill', fill);
+      circle.setAttribute('stroke', stroke);
+      circle.setAttribute('stroke-width', strokeW);
+      g.appendChild(circle);
+
+      const keyText = document.createElementNS(svgNS, 'text');
+      keyText.setAttribute('class', 'node-label');
+      keyText.setAttribute('y', -3); keyText.setAttribute('font-size', '16');
+      keyText.setAttribute('fill', '#F5F6FC');
+      keyText.textContent = node.k;
+      g.appendChild(keyText);
+
+      const valText = document.createElementNS(svgNS, 'text');
+      valText.setAttribute('class', 'node-val');
+      valText.setAttribute('y', 15); valText.setAttribute('font-size', '12');
+      valText.setAttribute('fill', '#ACB2C8');
+      valText.textContent = node.v;
+      g.appendChild(valText);
+
+      if (i === 0){
+        const chip = document.createElementNS(svgNS, 'g');
+        chip.setAttribute('transform', 'translate(0,' + (-nodeR - 18) + ')');
+        const rect = document.createElementNS(svgNS, 'rect');
+        rect.setAttribute('x', -25); rect.setAttribute('y', -11); rect.setAttribute('width', 50); rect.setAttribute('height', 18); rect.setAttribute('rx', 9);
+        rect.setAttribute('fill', '#6C7BFF');
+        chip.appendChild(rect);
+        const t = document.createElementNS(svgNS, 'text');
+        t.setAttribute('class', 'chip-text'); t.setAttribute('y', 3); t.setAttribute('fill', '#0E1030');
+        t.textContent = 'HEAD';
+        chip.appendChild(t);
+        g.appendChild(chip);
+      } else if (i === n - 1 && n > 1){
+        const chip = document.createElementNS(svgNS, 'g');
+        chip.setAttribute('transform', 'translate(0,' + (nodeR + 24) + ')');
+        const rect = document.createElementNS(svgNS, 'rect');
+        rect.setAttribute('x', -23); rect.setAttribute('y', -11); rect.setAttribute('width', 46); rect.setAttribute('height', 18); rect.setAttribute('rx', 9);
+        rect.setAttribute('fill', '#FFB020');
+        chip.appendChild(rect);
+        const t = document.createElementNS(svgNS, 'text');
+        t.setAttribute('class', 'chip-text'); t.setAttribute('y', 3); t.setAttribute('fill', '#341F04');
+        t.textContent = 'TAIL';
+        chip.appendChild(t);
+        g.appendChild(chip);
+      }
+
+      nodesG.appendChild(g);
+    });
+
+    fading = fading.filter(node => {
+      const t = (now - node.fadeStart) / 550;
+      if (t >= 1) return false;
+      const p = point(normalize(node.angle), radius + t * 55);
+      const opacity = 1 - t;
+      const g = document.createElementNS(svgNS, 'g');
+      g.setAttribute('transform', 'translate(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')');
+      g.setAttribute('opacity', opacity.toFixed(2));
+      const circle = document.createElementNS(svgNS, 'circle');
+      circle.setAttribute('r', nodeR); circle.setAttribute('fill', '#1B1E2E');
+      circle.setAttribute('stroke', '#FF5C6C'); circle.setAttribute('stroke-width', 3);
+      g.appendChild(circle);
+      const keyText = document.createElementNS(svgNS, 'text');
+      keyText.setAttribute('class', 'node-label'); keyText.setAttribute('y', -3); keyText.setAttribute('font-size', '16');
+      keyText.setAttribute('fill', '#FF5C6C');
+      keyText.textContent = node.k;
+      g.appendChild(keyText);
+      nodesG.appendChild(g);
+      return true;
+    });
+
+    if (n === 0){
+      const emptyText = document.createElementNS(svgNS, 'text');
+      emptyText.setAttribute('x', cx); emptyText.setAttribute('y', cy);
+      emptyText.setAttribute('text-anchor', 'middle'); emptyText.setAttribute('font-size', '15');
+      emptyText.setAttribute('fill', '#ACB2C8'); emptyText.setAttribute('font-family', "'IBM Plex Mono',monospace");
+      emptyText.textContent = 'ring is empty — add an item to begin';
+      flagsG.appendChild(emptyText);
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  // ---- wiring ----
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  document.getElementById('putBtn').addEventListener('click', () => {
+    put(document.getElementById('keyInput').value.trim(), document.getElementById('valInput').value.trim());
+  });
+  document.getElementById('getBtn').addEventListener('click', () => {
+    get(document.getElementById('keyInput').value.trim());
+  });
+  document.getElementById('keyInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('putBtn').click(); });
+  document.getElementById('valInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('putBtn').click(); });
+
+  capRange.addEventListener('input', () => setCapacity(parseInt(capRange.value, 10)));
+  document.getElementById('resetBtn').addEventListener('click', reset);
+
+  document.getElementById('insBtn').addEventListener('click', () => {
+    const k = document.getElementById('rawKeyInput').value.trim();
+    const v = document.getElementById('rawValInput').value.trim();
+    if (!k) return;
+    if (nodeMap.has(k)){ log('Key "' + k + '" already exists — pick a different key to keep this demo\'s map in sync.', '', 'miss'); return; }
+    rawInsAtBegin(k, v);
+    renderArray(k, 'new');
+    refreshMoveSelect();
+  });
+  document.getElementById('delBtn').addEventListener('click', () => { rawDelAtEnd(); renderArray(); refreshMoveSelect(); });
+  document.getElementById('moveBtn').addEventListener('click', () => {
+    const k = moveSelect.value;
+    if (!k || !nodeMap.has(k)) return;
+    rawMoveToFro(nodeMap.get(k));
+    renderArray(k, 'hit');
+    refreshMoveSelect();
+  });
+  document.getElementById('traverseBtn').addEventListener('click', traverse);
+
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+  document.getElementById('demoBtn').addEventListener('click', async () => {
+    reset();
+    capRange.value = 3; setCapacity(3);
+    log('Demo started: capacity set to 3.', '', 'info');
+    await sleep(500); put('1', '10'); await sleep(750);
+    put('2', '20'); await sleep(750);
+    put('3', '30'); await sleep(950);
+    await sleep(500); put('4', '40'); await sleep(1050);
+    await sleep(500); get('2'); await sleep(1050);
+    await sleep(500); put('5', '50');
+  });
+
+  initSvgGroups();
+  explain('info', 'Nothing has happened yet.', 'Try PUT 1, 10 to add your first item.');
+  layoutTargets();
+  renderArray();
+  refreshMoveSelect();
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
